@@ -6,8 +6,8 @@
 //
 
 import Foundation
-import Vapor
 import XMLParsing
+import Vapor
 
 public protocol BraintreeContent: Content {
     static var key: String { get }
@@ -18,9 +18,8 @@ public final class EmptyPayload: BraintreeContent {
     public init() {}
 }
 
-public class Http {
-    public typealias Future = EventLoopFuture
-    
+public struct Http {
+
     public struct File: Codable {
         public var filename: String
         public var data: Data
@@ -28,193 +27,141 @@ public class Http {
         public var ext: String?
     }
     
-    public enum RequestMethod: Int, Codable {
-        case delete, get, post, put
-    }
+    let application: Application
+    let configuration: Configuration
+
+    private let httpHeaders: HTTPHeaders
     
-    private var container: Container
-    public var configuration: Configuration
-    
-    public init (container: Container, configuration: Configuration) {
-        self.container = container
+    public init(application: Application, configuration: Configuration) throws {
+        self.application = application
         self.configuration = configuration
+        self.httpHeaders = try configuration.httpHeaders()
+    }
+
+    public func get<Response: Codable>(_ url: String) async throws -> Response {
+        try await send(method: .GET, url: url) {
+            try await application.client.get($0)
+        }
+    }
+
+    public func post<Response: Codable>(_ url: String) async throws -> Response {
+        try await post(url, payload: EmptyPayload())
     }
     
-    public func _getArray<T: Codable>(_ url: String) throws -> Future<[T]> {
-        return try get(url).catchMap { error in
-            let errStr = "\(error)"
-            if errStr.contains("Index 0") { //TODO: remove that dirty hack
-                return []
-            }
-            throw error
+    public func post<Payload: BraintreeContent, Response: Codable>(
+        _ url: String,
+        payload: Payload,
+        desiredCode: Int? = nil
+    ) async throws -> Response {
+        try await send(method: .POST, url: url) {
+            try await application.client.post($0, headers: httpHeaders, content: [Payload.key: payload])
         }
     }
     
-    public func get<R>(_ url: String) throws -> Future<R> where R: Codable {
-        let request = Request(url: configuration.baseURL + url, method: .GET, headers: try headers(), body: nil)
-        return try send(request).map { response in
-            self.configuration.logger.log(.info, message: "\(Date()) \(request.method.rawValue) \(url)")
-            self.configuration.logger.log(.fine, message: "\(Date()) \(request.method.rawValue) \(url) \(response.statusCode)")
-            switch true {
-            case response.statusCode == 200:
-                return try self.decode(response: response)
-            default:
-                throw BraintreeError(BraintreeErrorCase.server, reason: "Unknown status: \(response.statusCode) url: \(self.configuration.baseURL + url)")
-            }
+    public func put<Payload: BraintreeContent, Response: Codable>(_ url: String, payload: Payload) async throws -> Response {
+        try await send(method: .PUT, url: url) {
+            try await application.client.post($0, headers: httpHeaders, content: payload)
         }
     }
     
-    public func _postArray<R>(_ url: String) throws -> Future<[R]> where R: Codable {
-        return try _postArray(url, payload: EmptyPayload())
-    }
-    
-    public func _postArray<P, R>(_ url: String, payload: P) throws -> Future<[R]> where P: BraintreeContent, R: Codable {
-        return try post(url, payload: payload).catchMap { error in
-            let errStr = "\(error)"
-            if errStr.contains("Index 0") { //TODO: remove that dirty hack
-                return []
-            }
-            throw error
+    public func delete<Response: Codable>(_ url: String) async throws -> Response {
+        try await send(method: .DELETE, url: url) {
+            try await application.client.delete($0, headers: httpHeaders)
         }
     }
-    
-    public func post<R>(_ url: String) throws -> Future<R> where R: Codable {
-        return try post(url, payload: EmptyPayload())
-    }
-    
-    public func post<P, R>(_ url: String, payload: P, desiredCode: Int? = nil) throws -> Future<R> where P: BraintreeContent, R: Codable {
-        let payload = try encode(payload)
-        let request = Request(url: configuration.baseURL + url, method: .POST, headers: try headers(), body: payload)
-        return try send(request).map { response in
-            self.configuration.logger.log(.info, message: "\(Date()) \(request.method.rawValue) \(url)")
-            self.configuration.logger.log(.fine, message: "\(Date()) \(request.method.rawValue) \(url) \(response.statusCode)")
-            switch true {
-            case response.statusCode == desiredCode ?? 200:
-                return try self.decode(response: response)
-            default:
-                throw BraintreeError(BraintreeErrorCase.server, reason: "Braintree API returned status: \(response.statusCode)")
-            }
+
+    // MARK: - Arrays
+
+    public func _getArray<T: Codable>(_ url: String) async throws -> [T] {
+        do {
+            return try await get(url)
+        } catch {
+            return try throwOrReturnEmptyArray(error)
         }
     }
-    
-    public func put<P, R>(_ url: String, payload: P) throws -> Future<R> where P: BraintreeContent, R: Codable {
-        let payload = try encode(payload)
-        let request = Request(url: configuration.baseURL + url, method: .PUT, headers: try headers(), body: payload)
-        return try send(request).map { response in
-            self.configuration.logger.log(.info, message: "\(Date()) \(request.method.rawValue) \(url)")
-            self.configuration.logger.log(.fine, message: "\(Date()) \(request.method.rawValue) \(url) \(response.statusCode)")
-            switch true {
-            case response.statusCode == 200:
-                return try self.decode(response: response)
-            default:
-                throw BraintreeError(BraintreeErrorCase.server)
-            }
+
+    public func _postArray<T: Codable>(_ url: String) async throws -> [T] {
+        try await _postArray(url, payload: EmptyPayload())
+    }
+
+    public func _postArray<Payload: BraintreeContent, T: Codable>(_ url: String, payload: Payload) async throws -> [T] {
+        do {
+            return try await post(url, payload: payload)
+        } catch {
+            return try throwOrReturnEmptyArray(error)
         }
     }
-    
-    public func delete<R>(_ url: String) throws -> Future<R> where R: Codable {
-        let request = Request(url: configuration.baseURL + url, method: .DELETE, headers: try headers(), body: nil)
-        return try send(request).map { response in
-            self.configuration.logger.log(.info, message: "\(Date()) \(request.method.rawValue) \(url)")
-            self.configuration.logger.log(.fine, message: "\(Date()) \(request.method.rawValue) \(url) \(response.statusCode)")
-            switch true {
-            case response.statusCode == 200:
-                return try self.decode(response: response)
-            default:
-                throw BraintreeError(BraintreeErrorCase.server)
-            }
-        }
+
+    private func send<Response: Codable>(
+        method: HTTPMethod,
+        url: String,
+        action: (URI) async throws -> ClientResponse
+    ) async throws -> Response {
+        log(method: method, url: url)
+        let response = try await action(makeURI(url))
+        log(method: method, url: url, status: response.status)
+
+        try check(response: response, url: url)
+
+        return try decode(response: response)
     }
     
-    private func encode<T>(_ payload: T) throws -> Data where T: BraintreeContent {
-        let payload = try JSONEncoder().encode(payload)
-        let payloadDict = try JSONSerialization.jsonObject(with: payload, options: .allowFragments)
-        let dict: [String: Any] = [T.key: payloadDict]
-        return try JSONSerialization.data(withJSONObject: dict, options: JSONSerialization.WritingOptions.init(rawValue: 0))
-    }
-    
-    private func decode<T>(response: Response) throws -> T where T: Codable {
-        guard let responseData = response.data else {
-            throw BraintreeError(BraintreeErrorCase.server, reason: "Response data cannot be nil")
-        }
-        let result = try XMLDecoder().decode(T.self, from: responseData)
-        print("decoded: \(result)")
+    private func decode<T>(response: ClientResponse) throws -> T where T: Codable {
+        let result = try response.content.decode(T.self, using: XMLDecoder())
+        // print("decoded: \(result)")
         return result
     }
-    
-    private func headers() throws -> [String: String] {
-        var headers: [String: String] = [:]
-        headers["Accept"] = "application/xml"
-        headers["User-Agent"] = "Braintree Swift " + Configuration.version
-        headers["X-ApiVersion"] = Configuration.apiVersion
-        headers["Authorization"] = try authorizationHeader()
-        headers["Accept-Encoding"] = "gzip"
-        headers["Content-Type"] = "application/json"
-        return headers
-    }
-    
-    private func authorizationHeader() throws -> String {
-        if let accessToken = configuration.accessToken {
-            return "Bearer " + accessToken
-        }
-        var credentials = ""
-        if let clientId = configuration.clientId, let clientSecret = configuration.clientSecret {
-            credentials = clientId + ":" + clientSecret
-        } else if let publicKey = configuration.publicKey, let privateKey = configuration.privateKey {
-            credentials = publicKey + ":" + privateKey
+
+    private func log(method: HTTPMethod, url: String, status: HTTPStatus? = nil) {
+        if let status = status {
+            configuration.logger.log(.fine, message: "\(Date()) \(method.rawValue) \(url) \(status.code)")
         } else {
-            throw BraintreeError(.configuration, reason: "Unable to get authorization credentials")
+            configuration.logger.log(.info, message: "\(Date()) \(method.rawValue) \(url)")
         }
+    }
+
+    private func makeURI(_ url: String) -> URI {
+        .init(stringLiteral: configuration.baseURL + url)
+    }
+
+    private func check(response: ClientResponse, url: String) throws {
+        guard (200..<300) ~= response.status.code else {
+            throw BraintreeError(
+                .server,
+                reason: "Braintree API returned status: \(response.status.code) url: \(configuration.baseURL + url)"
+            )
+        }
+    }
+
+    private func throwOrReturnEmptyArray<T: Codable>(_ error: Error) throws -> [T] {
+        if "\(error)".contains("Index 0") {
+            return []
+        } else {
+            throw error
+        }
+    }
+
+}
+
+
+private extension Configuration {
+
+    func httpHeaders() throws -> HTTPHeaders {
+        [
+            "Accept": "application/xml",
+            "User-Agent": "Braintree Swift " + version,
+            "X-ApiVersion": apiVersion,
+            "Authorization": try authorizationHeader(),
+            "Content-Type": "application/json"
+        ]
+    }
+
+    private func authorizationHeader() throws -> String {
+        let credentials = "\(publicKey):\(privateKey)"
         guard let base64String = credentials.data(using: .utf8)?.base64EncodedString() else {
             throw BraintreeError(.configuration, reason: "Unable to encode authorization credentials to base64")
         }
         return "Basic " + base64String.trimmingCharacters(in: .whitespaces)
     }
-    
-    struct Request: Codable {
-        var url: String
-        enum Method: String, Codable {
-            case POST, PUT, GET, DELETE
-        }
-        var method: Method
-        var headers: [String: String] = [:]
-        var body: Data?
-    }
-    
-    struct Response: Codable {
-        var statusCode: Int
-        var data: Data?
-        
-        init (_ resp: HTTPURLResponse, data: Data?) {
-            self.statusCode = resp.statusCode
-            self.data = data
-        }
-    }
-    
-    //TODO: use standard Vapor's client instead
-    private func send(_ req: Request) throws -> EventLoopFuture<Response> {
-        guard let url = URL(string: req.url) else { throw BraintreeError(BraintreeErrorCase.server, reason: "Wrong URL") }
-        var urlReq = URLRequest(url: url)
-        urlReq.httpMethod = req.method.rawValue
-        urlReq.httpBody = req.body ?? Data()
-        req.headers.forEach { key, val in
-            urlReq.addValue(val, forHTTPHeaderField: key.description)
-        }
-        let promise = container.eventLoop.newPromise(Response.self)
-        let urlSession = URLSession(configuration: .default)
-        urlSession.dataTask(with: urlReq) { data, urlResponse, error in
-            if let error = error {
-                promise.fail(error: error)
-                return
-            }
-            
-            guard let httpResponse = urlResponse as? HTTPURLResponse else {
-                let error = BraintreeError(BraintreeErrorCase.server, reason: "URLResponse was not a HTTPURLResponse.")
-                promise.fail(error: error)
-                return
-            }
-            promise.succeed(result: Response(httpResponse, data: data))
-            }.resume()
-        return promise.futureResult
-    }
+
 }

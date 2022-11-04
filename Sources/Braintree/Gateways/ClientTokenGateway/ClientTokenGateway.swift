@@ -8,22 +8,23 @@
 import Foundation
 import Vapor
 
-public class ClientTokenGateway {
-    public var http: Http
-    public var configuration: Configuration
+public struct ClientTokenGateway {
+
+    let http: Http
+    let configuration: Configuration
     
     public init(http: Http, configuration: Configuration) {
         self.http = http
         self.configuration = configuration
     }
     
-    public func generate(request: ClientTokenRequest) throws -> Future<String> {
+    public func generate(request: ClientTokenRequest) async throws -> ClientTokenResponse {
         try verifyOptions(request: request)
-        return try http.post(try configuration.merchantPath() + "/client_token/", payload: request)
+        return try await http.post(configuration.merchantPath + "/client_token/", payload: request)
     }
     
     private func verifyOptions(request: ClientTokenRequest) throws {
-        if let options = request.optionsRequest, request.customerId == nil {
+        if let options = request.options, request.customerId == nil {
             var invalidOptions: [String] = []
             if options.verifyCard != nil {
                 invalidOptions.append("VerifyCard")
@@ -39,4 +40,5 @@ public class ClientTokenGateway {
             }
         }
     }
+    
 }

@@ -8,15 +8,15 @@
 import Foundation
 import Vapor
 
-public class BraintreeGateway {
-    var configuration: Configuration
-    //private var graphQLClient: GraphQLClient
-    var http: Http
+public struct BraintreeGateway {
+
+    let configuration: Configuration
+    let http: Http
     
     /// Instantiates a BraintreeGateway. Use the values provided by Braintree
-    init(container: Container, configuration: Configuration) {
+    public init(application: Application, configuration: Configuration) throws {
         self.configuration = configuration
-        self.http = Http(container: container, configuration: configuration)
+        self.http = try Http(application: application, configuration: configuration)
     }
     
     public var addOn: AddOnGateway {
@@ -130,4 +130,5 @@ public class BraintreeGateway {
     public var report: ReportGateway {
         return ReportGateway(http: http, configuration: configuration)
     }
+
 }

@@ -7,7 +7,8 @@
 
 import Foundation
 
-public final class ClientTokenOptionsRequest: BraintreeContent {
+public struct ClientTokenOptions: BraintreeContent {
+
     public static var key: String = "client-token-options"
     public var makeDefault: Bool?
     public var verifyCard: Bool?
@@ -18,4 +19,5 @@ public final class ClientTokenOptionsRequest: BraintreeContent {
         case verifyCard = "verify-card"
         case failOnDuplicatePaymentMethod = "fail-on-duplicate-payment-method"
     }
+
 }

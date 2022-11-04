@@ -8,16 +8,18 @@
 import Foundation
 import Vapor
 
-public class AddOnGateway {
-    public var http: Http
-    public var configuration: Configuration
+public struct AddOnGateway {
+
+    let http: Http
+    let configuration: Configuration
     
     public init(http: Http, configuration: Configuration) {
         self.http = http
         self.configuration = configuration
     }
     
-    public func all() throws -> Future<[AddOn]> {
-        return try http._getArray(try configuration.merchantPath() + "/add_ons")
+    public func all() async throws -> [AddOn] {
+        try await http._getArray(configuration.merchantPath + "/add_ons")
     }
+
 }
