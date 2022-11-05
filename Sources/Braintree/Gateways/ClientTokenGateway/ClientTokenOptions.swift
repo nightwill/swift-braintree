@@ -5,19 +5,18 @@
 //  Created by Mihael Isaev on 28/09/2018.
 //
 
-import Foundation
+import Vapor
 
-public struct ClientTokenOptions: BraintreeContent {
+public struct ClientTokenOptions: Content {
 
-    public static var key: String = "client-token-options"
-    public var makeDefault: Bool?
-    public var verifyCard: Bool?
-    public var failOnDuplicatePaymentMethod: Bool?
-    
-    private enum CodingKeys : String, CodingKey {
-        case makeDefault = "make-default"
-        case verifyCard = "verify-card"
-        case failOnDuplicatePaymentMethod = "fail-on-duplicate-payment-method"
+    let makeDefault: Bool?
+    let verifyCard: Bool?
+    let failOnDuplicatePaymentMethod: Bool?
+
+    public init(makeDefault: Bool? = nil, verifyCard: Bool? = nil, failOnDuplicatePaymentMethod: Bool? = nil) {
+        self.makeDefault = makeDefault
+        self.verifyCard = verifyCard
+        self.failOnDuplicatePaymentMethod = failOnDuplicatePaymentMethod
     }
 
 }

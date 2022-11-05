@@ -9,62 +9,53 @@ import Foundation
 import XMLParsing
 import Vapor
 
-public protocol BraintreeContent: Content {
-    static var key: String { get }
-}
+private let decoder = XMLDecoder()
+private let encoder = {
+    let encoder = JSONEncoder()
+    encoder.keyEncodingStrategy = .convertToSnakeCase
+    return encoder
+}()
 
-public final class EmptyPayload: BraintreeContent {
-    public static var key: String = ""
-    public init() {}
-}
-
-public struct Http {
-
-    public struct File: Codable {
-        public var filename: String
-        public var data: Data
-        public var contentType: String?
-        public var ext: String?
-    }
+struct Http {
     
     let application: Application
-    let configuration: Configuration
+    let configuration: BraintreeConfiguration
 
     private let httpHeaders: HTTPHeaders
     
-    public init(application: Application, configuration: Configuration) throws {
+    init(application: Application, configuration: BraintreeConfiguration) throws {
         self.application = application
         self.configuration = configuration
         self.httpHeaders = try configuration.httpHeaders()
     }
 
-    public func get<Response: Codable>(_ url: String) async throws -> Response {
+    func get<Response: Codable>(_ url: String) async throws -> Response {
         try await send(method: .GET, url: url) {
             try await application.client.get($0)
         }
     }
 
-    public func post<Response: Codable>(_ url: String) async throws -> Response {
+    func post<Response: Codable>(_ url: String) async throws -> Response {
         try await post(url, payload: EmptyPayload())
     }
     
-    public func post<Payload: BraintreeContent, Response: Codable>(
+    func post<Payload: Content, Response: Codable>(
         _ url: String,
         payload: Payload,
         desiredCode: Int? = nil
     ) async throws -> Response {
         try await send(method: .POST, url: url) {
-            try await application.client.post($0, headers: httpHeaders, content: [Payload.key: payload])
+            try await application.client.post($0, headers: httpHeaders, beforeSend: { try $0.content.encode(payload, using: encoder) })
         }
     }
     
-    public func put<Payload: BraintreeContent, Response: Codable>(_ url: String, payload: Payload) async throws -> Response {
+    func put<Payload: Content, Response: Codable>(_ url: String, payload: Payload) async throws -> Response {
         try await send(method: .PUT, url: url) {
-            try await application.client.post($0, headers: httpHeaders, content: payload)
+            try await application.client.post($0, headers: httpHeaders, beforeSend: { try $0.content.encode(payload, using: encoder) })
         }
     }
     
-    public func delete<Response: Codable>(_ url: String) async throws -> Response {
+    func delete<Response: Codable>(_ url: String) async throws -> Response {
         try await send(method: .DELETE, url: url) {
             try await application.client.delete($0, headers: httpHeaders)
         }
@@ -72,7 +63,7 @@ public struct Http {
 
     // MARK: - Arrays
 
-    public func _getArray<T: Codable>(_ url: String) async throws -> [T] {
+    func _getArray<T: Codable>(_ url: String) async throws -> [T] {
         do {
             return try await get(url)
         } catch {
@@ -80,11 +71,11 @@ public struct Http {
         }
     }
 
-    public func _postArray<T: Codable>(_ url: String) async throws -> [T] {
+    func _postArray<T: Codable>(_ url: String) async throws -> [T] {
         try await _postArray(url, payload: EmptyPayload())
     }
 
-    public func _postArray<Payload: BraintreeContent, T: Codable>(_ url: String, payload: Payload) async throws -> [T] {
+    func _postArray<Payload: Content, T: Codable>(_ url: String, payload: Payload) async throws -> [T] {
         do {
             return try await post(url, payload: payload)
         } catch {
@@ -97,9 +88,7 @@ public struct Http {
         url: String,
         action: (URI) async throws -> ClientResponse
     ) async throws -> Response {
-        log(method: method, url: url)
         let response = try await action(makeURI(url))
-        log(method: method, url: url, status: response.status)
 
         try check(response: response, url: url)
 
@@ -107,17 +96,9 @@ public struct Http {
     }
     
     private func decode<T>(response: ClientResponse) throws -> T where T: Codable {
-        let result = try response.content.decode(T.self, using: XMLDecoder())
+        let result = try response.content.decode(T.self, using: decoder)
         // print("decoded: \(result)")
         return result
-    }
-
-    private func log(method: HTTPMethod, url: String, status: HTTPStatus? = nil) {
-        if let status = status {
-            configuration.logger.log(.fine, message: "\(Date()) \(method.rawValue) \(url) \(status.code)")
-        } else {
-            configuration.logger.log(.info, message: "\(Date()) \(method.rawValue) \(url)")
-        }
     }
 
     private func makeURI(_ url: String) -> URI {
@@ -126,10 +107,8 @@ public struct Http {
 
     private func check(response: ClientResponse, url: String) throws {
         guard (200..<300) ~= response.status.code else {
-            throw BraintreeError(
-                .server,
-                reason: "Braintree API returned status: \(response.status.code) url: \(configuration.baseURL + url)"
-            )
+            print(try? response.content.decode(String.self, using: XMLDecoder()))
+            throw "Braintree API returned status: \(response.status.code) url: \(configuration.baseURL + url)"
         }
     }
 
@@ -143,8 +122,7 @@ public struct Http {
 
 }
 
-
-private extension Configuration {
+private extension BraintreeConfiguration {
 
     func httpHeaders() throws -> HTTPHeaders {
         [
@@ -159,9 +137,11 @@ private extension Configuration {
     private func authorizationHeader() throws -> String {
         let credentials = "\(publicKey):\(privateKey)"
         guard let base64String = credentials.data(using: .utf8)?.base64EncodedString() else {
-            throw BraintreeError(.configuration, reason: "Unable to encode authorization credentials to base64")
+            throw "Unable to encode authorization credentials to base64"
         }
         return "Basic " + base64String.trimmingCharacters(in: .whitespaces)
     }
 
 }
+
+private struct EmptyPayload: Content { }

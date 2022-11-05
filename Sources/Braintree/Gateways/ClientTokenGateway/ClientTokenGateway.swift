@@ -11,9 +11,9 @@ import Vapor
 public struct ClientTokenGateway {
 
     let http: Http
-    let configuration: Configuration
+    let configuration: BraintreeConfiguration
     
-    public init(http: Http, configuration: Configuration) {
+    init(http: Http, configuration: BraintreeConfiguration) {
         self.http = http
         self.configuration = configuration
     }
@@ -24,7 +24,7 @@ public struct ClientTokenGateway {
     }
     
     private func verifyOptions(request: ClientTokenRequest) throws {
-        if let options = request.options, request.customerId == nil {
+        if let options = request.clientToken.clientTokenOptions, request.clientToken.customerId == nil {
             var invalidOptions: [String] = []
             if options.verifyCard != nil {
                 invalidOptions.append("VerifyCard")
@@ -36,7 +36,7 @@ public struct ClientTokenGateway {
                 invalidOptions.append("FailOnDuplicatePaymentMethod")
             }
             if !invalidOptions.isEmpty {
-                throw BraintreeError(.unexpected, reason: "Following arguments are invalid without customerId: " + invalidOptions.joined(separator: ", "))
+                throw "Following arguments are invalid without customerId: " + invalidOptions.joined(separator: ", ")
             }
         }
     }

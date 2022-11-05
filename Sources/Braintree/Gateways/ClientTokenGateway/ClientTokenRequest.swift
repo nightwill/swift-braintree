@@ -5,28 +5,20 @@
 //  Created by Mihael Isaev on 28/09/2018.
 //
 
-import Foundation
+import Vapor
 
-public struct ClientTokenRequest: BraintreeContent {
+public struct ClientTokenRequest: Content {
 
-    public static var key: String = "client-token"
-
-    public let customerId: String?
-    public let options: ClientTokenOptions?
-    public let version: Int = 2
-    //public let merchantAccountId: String
-    
-    private enum CodingKeys : String, CodingKey {
-        case customerId = "customer-id"
-        case options
-        case version
-        //case merchantAccountId = "merchant-account-id"
-    }
+    let clientToken: ClientToken
 
     public init(customerId: String? = nil, options: ClientTokenOptions? = nil) {
-        //self.merchantAccountId = merchantAccountId
-        self.customerId = customerId
-        self.options = options
+        self.clientToken = .init(customerId: customerId, clientTokenOptions: options)
     }
 
+}
+
+struct ClientToken: Codable {
+    let customerId: String?
+    let clientTokenOptions: ClientTokenOptions?
+    var version: Int = 2
 }
