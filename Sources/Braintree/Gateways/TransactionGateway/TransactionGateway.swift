@@ -16,4 +16,8 @@ public struct TransactionGateway {
         self.http = http
         self.configuration = configuration
     }
+
+    public func sale(_ request: TransactionRequest) async throws -> TransactionResponse {
+        return try await http.post(configuration.merchantPath + "/transactions/", payload: request)
+    }
 }

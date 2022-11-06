@@ -18,7 +18,7 @@ public struct ClientTokenGateway {
         self.configuration = configuration
     }
     
-    public func generate(request: ClientTokenRequest) async throws -> ClientTokenResponse {
+    public func generate(_ request: ClientTokenRequest) async throws -> ClientTokenResponse {
         try verifyOptions(request: request)
         return try await http.post(configuration.merchantPath + "/client_token/", payload: request)
     }

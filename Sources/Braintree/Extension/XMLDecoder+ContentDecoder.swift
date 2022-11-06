@@ -1,4 +1,4 @@
-import XMLParsing
+import XMLCoder
 import Vapor
 
 extension XMLDecoder: ContentDecoder {

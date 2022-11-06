@@ -164,15 +164,6 @@
         }
       },
       {
-        "package": "SWXMLHash",
-        "repositoryURL": "https://github.com/drmohundro/SWXMLHash.git",
-        "state": {
-          "branch": null,
-          "revision": "0ce63a93a455adb3cd5e4c55f78f1232a590a5a5",
-          "version": "4.7.2"
-        }
-      },
-      {
         "package": "vapor",
         "repositoryURL": "https://github.com/vapor/vapor.git",
         "state": {
@@ -191,12 +182,12 @@
         }
       },
       {
-        "package": "XMLParsing",
-        "repositoryURL": "https://github.com/MihaelIsaev/XMLParsing.git",
+        "package": "XMLCoder",
+        "repositoryURL": "https://github.com/CoreOffice/XMLCoder",
         "state": {
           "branch": null,
-          "revision": "8853c2c4b6332095d1f5b1db6a4a9b99431cc233",
-          "version": "0.1.0"
+          "revision": "ca932442d7481700f5434a7b138c47dd42d9902b",
+          "version": "0.14.0"
         }
       }
     ]

@@ -7,18 +7,24 @@
 
 import Vapor
 
-public final class TransactionRequest: Content {
+public struct TransactionRequest: Content {
 
-    let amount: Double
-    let deviceData: String?
-    let paymentMethodID: String
-    let transactionOptionsRequest: TransactionOptionsRequest
+    private let transaction: Transaction
 
-    public init(amount: Double, paymentMethodID: String, transactionOptionsRequest: TransactionOptionsRequest, deviceData: String? = nil) {
-        self.amount = amount
-        self.deviceData = deviceData
-        self.paymentMethodID = paymentMethodID
-        self.transactionOptionsRequest = transactionOptionsRequest
+    public init(amount: Double, nonce: String, options: TransactionOptions, deviceData: String? = nil) {
+        self.transaction = .init(amount: amount, deviceData: deviceData, paymentMethodNonce: nonce, options: options)
     }
 
+}
+
+private enum TransactionType: String, Codable {
+    case sale, credit
+}
+
+private struct Transaction: Codable {
+    let amount: Double
+    let deviceData: String?
+    let paymentMethodNonce: String
+    let options: TransactionOptions
+    var type: TransactionType = .sale
 }
