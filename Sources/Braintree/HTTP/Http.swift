@@ -146,6 +146,7 @@ private extension BraintreeConfiguration {
 
     private func authorizationHeader() throws -> String {
         let credentials = "\(publicKey):\(privateKey)"
+        print("credentials: ", credentials)
         guard let base64String = credentials.data(using: .utf8)?.base64EncodedString() else {
             throw "Unable to encode authorization credentials to base64"
         }
