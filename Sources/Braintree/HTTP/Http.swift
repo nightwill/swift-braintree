@@ -49,7 +49,8 @@ struct Http {
         desiredCode: Int? = nil
     ) async throws -> Response {
         try await send(method: .POST, url: url) {
-            // print(String(data: try! encoder.encode(payload), encoding: .utf8))
+            print(httpHeaders)
+            print(String(data: try! encoder.encode(payload), encoding: .utf8))
             return try await application.client.post($0, headers: httpHeaders, beforeSend: { try $0.content.encode(payload, using: encoder) })
         }
     }
