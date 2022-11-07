@@ -9,12 +9,12 @@ import Foundation
 import XMLCoder
 import Vapor
 
-private let decoder = {
+private let decoder: XMLDecoder = {
     let decoder = XMLDecoder()
     decoder.keyDecodingStrategy = .convertFromSnakeCase
     return decoder
 }()
-private let encoder = {
+private let encoder: JSONEncoder = {
     let encoder = JSONEncoder()
     encoder.keyEncodingStrategy = .convertToSnakeCase
     return encoder
@@ -112,7 +112,7 @@ struct Http {
 
     private func check(response: ClientResponse, url: String) throws {
         guard (200..<300) ~= response.status.code else {
-            print(try? response.content.decode(String.self, using: decoder))
+            // print(try? response.content.decode(String.self, using: decoder))
             if let errorResponse = try? response.content.decode(APIErrorResponse.self, using: decoder) {
                 throw errorResponse.message
             } else {
