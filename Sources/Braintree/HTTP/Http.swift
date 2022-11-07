@@ -112,7 +112,7 @@ struct Http {
 
     private func check(response: ClientResponse, url: String) throws {
         guard (200..<300) ~= response.status.code else {
-            print(try? response.content.decode(String.self, using: decoder))
+            // print(try? response.content.decode(String.self, using: decoder))
             if let errorResponse = try? response.content.decode(APIErrorResponse.self, using: decoder) {
                 throw errorResponse.message
             } else {
