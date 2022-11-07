@@ -49,7 +49,7 @@ struct Http {
         desiredCode: Int? = nil
     ) async throws -> Response {
         try await send(method: .POST, url: url) {
-            // print(String(data: try! encoder.encode(payload), encoding: .utf8))
+            print(String(data: try! encoder.encode(payload), encoding: .utf8))
             return try await application.client.post($0, headers: httpHeaders, beforeSend: { try $0.content.encode(payload, using: encoder) })
         }
     }
@@ -112,7 +112,7 @@ struct Http {
 
     private func check(response: ClientResponse, url: String) throws {
         guard (200..<300) ~= response.status.code else {
-            // print(try? response.content.decode(String.self, using: decoder))
+            print(try? response.content.decode(String.self, using: decoder))
             if let errorResponse = try? response.content.decode(APIErrorResponse.self, using: decoder) {
                 throw errorResponse.message
             } else {
