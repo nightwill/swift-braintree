@@ -9,12 +9,12 @@ import Foundation
 import XMLCoder
 import Vapor
 
-private let decoder = {
+private let decoder: XMLDecoder = {
     let decoder = XMLDecoder()
     decoder.keyDecodingStrategy = .convertFromSnakeCase
     return decoder
 }()
-private let encoder = {
+private let encoder: JSONEncoder = {
     let encoder = JSONEncoder()
     encoder.keyEncodingStrategy = .convertToSnakeCase
     return encoder
